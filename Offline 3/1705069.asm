@@ -9,11 +9,13 @@
     OP1 DW ?
     OP2 DW ?
     OPR DW ?
+    RESULT DW ?
     LB DB CR, LF, '$'
+    ERR DB CR, LF, 'Wrong operator$'
 
 .CODE
 ;DATA SEGMENT INITIALIZATION
-    MAIN PROC
+MAIN PROC
     
     MOV AX, @DATA
     MOV DS, AX
@@ -22,32 +24,42 @@
     CALL INDEC
     MOV OP1, AX
     
-    ;Linebreak
-    MOV AH, 9
-    LEA DX, LB
-    INT 21H
+    CALL LINE ;newline
     
     ;Operator input
     MOV AH, 1
     INT 21H
     
-    ;Linebreak
-    MOV AH, 9
-    LEA DX, LB
-    INT 21H
-    
     MOV AH, 0
     MOV OPR, AX
-   
     
+    ;Operator validity check
+    CMP AL, 'q'
+    JE @DOS_EXIT
+    CMP AL, '+'
+    JE @OPR_OK
+    CMP AL, '-'
+    JE @OPR_OK
+    CMP AL, '*'
+    JE @OPR_OK
+    CMP AL, '/'
+    JE @OPR_OK
+    
+    LEA DX, ERR
+    MOV AH, 9
+    INT 21H
+    JMP @DOS_EXIT ;operator is invalid, quit
+    
+    
+    ;Operator is valid, proceed
+    @OPR_OK:
+    CALL LINE; newline
+   
     ;Operand2 input
     CALL INDEC
     MOV OP2, AX
     
-    ;Linebreak
-    MOV AH, 9
-    LEA DX, LB
-    INT 21H
+    CALL LINE
     
     MOV AX, OP1
     MOV BX, OP2
@@ -56,19 +68,57 @@
     
     ;Performs operation
     CALL OP
-    
-    
+    MOV RESULT, AX
     
     ;Output (AX)
+    MOV AX, OP1
     CALL OUTDEC
     
-       
-    ;DOS EXIT
-    MOV AH, 4CH
+    MOV DX, OPR
+    MOV AH, 2
     INT 21H
     
+    MOV AX, OP2
+    CALL OUTDEC
     
+    MOV DX, '='
+    MOV AH, 2
+    INT 21H
+    
+    MOV AX, RESULT
+    CALL OUTDEC
+    
+    CALL LINE
+       
+    ;DOS EXIT
+    @DOS_EXIT:
+    MOV AH, 4CH
+    INT 21H
+        
 MAIN ENDP
+    
+LINE PROC
+    
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    PUSH AX  
+   
+    ;Linebreak
+    MOV AH, 2
+    MOV DL, 0DH
+    INT 21H
+    MOV DL, 0AH
+    INT 21H
+    
+    POP AX
+    POP DX
+    POP CX
+    POP BX
+    
+    RET    
+    
+LINE ENDP    
     
 OP PROC
     ;INPUT: AX = Operand1
@@ -94,8 +144,13 @@ OP PROC
     JMP @END
     
     @MULTIPLICATION:
+    IMUL BX
+    JMP @END
     
     @DIVISION:
+    MOV AX, AX
+    CWD
+    IDIV BX
     
     @END:
         RET
@@ -110,8 +165,6 @@ INDEC PROC
     ;INPUT: NONE
     ;OUTPUT: AX
     
-    
-    
     ;saves the registers on the stack
     PUSH BX
     PUSH CX
@@ -123,9 +176,10 @@ INDEC PROC
     
     ;Input from console
     MOV AH, 1
-    INT 21H
+    
     
     @CHECK:
+    INT 21H
     CMP AL, '-'
     JE @MINUS
     CMP AL, '0'
@@ -136,15 +190,16 @@ INDEC PROC
     
     @MINUS:
         MOV CX, 1
-        INT 21H    
-    
+        INT 21H
+            
     @WHILE:
+        
         CMP AL, 0DH
         JE @END_WHILE
         CMP AL, '0'
-        JL @WHILE
+        JL @INPUT
         CMP AL, '9'
-        JG @WHILE
+        JG @INPUT
         
         
         AND AX, 000FH ;converts to digit
@@ -156,7 +211,7 @@ INDEC PROC
         POP BX
         ADD BX, AX
         
-        ;input
+        @INPUT:
         MOV AH, 1
         INT 21H
         JMP @WHILE
@@ -169,9 +224,6 @@ INDEC PROC
     NEG BX
     @EXIT:
     MOV AX, BX
-    
-    
-    
     
     ;restores the registers back to initial state
     POP DX
@@ -188,25 +240,28 @@ OUTDEC PROC
     ;INPUT: AX
     ;OUTPUT: NONE
     
-    PUSH AX
+    
     PUSH BX
     PUSH CX
     PUSH DX
+    PUSH AX
     
     ;if AX < 0
     CMP AX, 0
     JGE @END_IF ;if AX >= 0
     ;then
+    PUSH AX ;save AX
     MOV AH, 2
     MOV DL, '-'
     INT 21H
-    POP AX
+    
+    POP AX ;get the number back from stack
     NEG AX ; AX = -AX 
     
     ;else
     @END_IF:
         MOV CX, 0 ;CX counts digits
-        MOV BX, 10D
+        MOV BX, 10
     
     @WHILE1:
         MOV DX, 0 ; Dividend
@@ -217,26 +272,19 @@ OUTDEC PROC
         CMP AX, 0 ; quo = 0?
         JNE @WHILE1
         
+    MOV AH, 2
         
     @PRINT_LOOP:    
         POP DX
         ADD DL, 30H
-        MOV AH, 2
         INT 21H
         LOOP @PRINT_LOOP
-    
-    ;Linebreak
-    MOV AH, 2
-    MOV DL, 0DH
-    INT 21H
-    MOV DL, 0AH
-    INT 21H
         
     ;exit
+    POP AX
     POP DX
     POP CX
     POP BX
-    POP AX
     RET   
     
 OUTDEC ENDP
