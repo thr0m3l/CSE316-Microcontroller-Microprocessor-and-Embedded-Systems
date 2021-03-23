@@ -3,6 +3,7 @@
 
 .DATA
 
+    N DW ?
 
 .CODE
 
@@ -12,64 +13,42 @@ MAIN PROC
     MOV DS, AX
     
     CALL INDEC
+    MOV N, AX ;saves N
+    MOV CX, 0 ;1st term
+    MOV DX, 1 ;2nd term
+    MOV BX, 1 ;counter
     
-    PUSH AX
+    MOV AX, CX
+    CALL OUTDEC
     
     CALL FIB
-    
-    CALL LINE
-    ;CALL OUTDEC
-    
+   
     MOV AH, 4CH
     INT 21H
     
 MAIN ENDP
 
 FIB PROC
-    PUSH BP ;saves BP
-    MOV BP, SP ;stack top
     
-    MOV AX, [BP+4] ;get N
+    PUSH BP
+    MOV BP, SP
     
-    CMP AX, 1 ; N = 1 ?
-    JE FIRST
-    CMP AX, 2
-    JE SECOND
-    JMP REC
+    CMP BX, N
+    JE RETURN
     
-    FIRST:
-        MOV AX, 0
-        JMP RETURN
-    SECOND:
-        MOV AX, 1
-        JMP RETURN
+    ADD CX, DX
+    XCHG CX, DX
+    INC BX
     
-    REC:
-    ;F(N-1)
-    MOV CX, [BP+4]
-    DEC CX
-    PUSH CX ;Save N-1
+    MOV AX, CX
+    CALL LINE
+    CALL OUTDEC
+    
     CALL FIB
-    PUSH AX ;save result1
-   
-    ;F(N-2)
-    MOV CX, [BP+4]
-    SUB CX, 2
-    PUSH CX ;save N-2
-    CALL FIB ;result2 in AX
-    
-    
-    ;F(N) = F(N-1) + F(N-2)
-    
-    POP BX ;get result1
-    ADD AX, BX
-    
     
     RETURN:
-        CALL OUTDEC
-        CALL LINE
-        POP BP
-        RET 2
+    POP BP
+    RET
     
     
     
@@ -213,9 +192,7 @@ LINE PROC
    
     ;Linebreak
     MOV AH, 2
-    MOV DL, 0DH
-    INT 21H
-    MOV DL, 0AH
+    MOV DL, ','
     INT 21H
     
     POP AX
